@@ -7,10 +7,13 @@ version = "0.1.0"
 
 repositories {
     mavenCentral()
+    jcenter()
 }
 
 dependencies {
     implementation(kotlin("stdlib-js"))
+    implementation("org.jetbrains.kotlinx:kotlinx-html-js:0.7.1")
+    implementation(npm("gl-matrix", "3.3.0"))
 }
 
 kotlin {
