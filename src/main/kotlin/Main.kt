@@ -1,1 +1,1 @@
-fun main() = Cube().animate()
+fun main() = Sphere().animate()
