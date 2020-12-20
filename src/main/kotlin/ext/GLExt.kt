@@ -29,6 +29,8 @@ inline fun <reified T> GL.getParameter(shader: WebGLShader, param: Int): T {
     return getShaderParameter(shader, param) as T
 }
 
+val GL.textureType get() = getExtension("OES_texture_half_float").HALF_FLOAT_OES as Int
+
 fun float32ArrayOf(vararg elements: Float) = Float32Array(elements.toTypedArray())
 
 fun float32ArrayOf(vararg elements: Pair<Float, Float>) = Float32Array(elements.flatMap { it.toList() }.toTypedArray())

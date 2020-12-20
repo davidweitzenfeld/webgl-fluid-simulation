@@ -7,7 +7,7 @@ import org.khronos.webgl.WebGLRenderingContext as GL
 
 
 fun main() {
-    window.onload = {
+    window.addEventListener("load", {
         val canvas = document.create.canvas {
             id = "canvas"
             width = "600"
@@ -16,6 +16,7 @@ fun main() {
         document.body!!.append(canvas)
 
         val gl = canvas.getContext("webgl") as GL
-        shader(gl, canvas)
-    }
+        val state = init2dFluidSimulation(canvas, gl)
+        run2dFluidSimulation(gl, state)
+    })
 }

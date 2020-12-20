@@ -29,4 +29,6 @@ class GLProgram(private val gl: GL, vertexShader: WebGLShader, fragmentShader: W
     fun bind() {
         gl.useProgram(program)
     }
+
+    operator fun get(uniformName: String): WebGLUniformLocation = uniforms[uniformName]!!
 }

@@ -1,5 +1,6 @@
 import ext.compileShader
 import ext.float32ArrayOf
+import ext.textureType
 import ext.uint16ArrayOf
 import glsl.AdvectionShader
 import glsl.DisplayShader
@@ -8,16 +9,14 @@ import glsl.VertexShader
 import kotlinx.browser.window
 import model.DoubleFramebuffer
 import model.Framebuffer
-import model.Pointer
-import org.khronos.webgl.Float32Array
-import org.khronos.webgl.Uint16Array
+import model.SelectionPointer
 import org.khronos.webgl.WebGLFramebuffer
 import org.w3c.dom.HTMLCanvasElement
-import kotlin.random.Random
+import org.w3c.dom.events.MouseEvent
 import org.khronos.webgl.WebGLRenderingContext as GL
 
 data class SimState(
-    var pointer: Pointer,
+    var pointer: SelectionPointer,
     var densityFramebuffer: DoubleFramebuffer,
     var velocityFramebuffer: DoubleFramebuffer,
     var width: Int,
@@ -27,168 +26,98 @@ data class SimState(
     val advectionProgram: GLProgram,
 )
 
-fun shader(gl: GL, canvas: HTMLCanvasElement) {
-    val textureWidth = gl.drawingBufferWidth shr 0
-    val textureHeight = gl.drawingBufferHeight shr 0
+fun init2dFluidSimulation(canvas: HTMLCanvasElement, gl: GL): SimState {
+    val (width, height) = gl.drawingBufferWidth to gl.drawingBufferHeight
 
-    gl.clearColor(0f, 0f, 0f, 1f)
-    gl.clear(GL.COLOR_BUFFER_BIT)
+    gl.clearColor(red = 0f, green = 0f, blue = 0f, alpha = 1f)
+    gl.viewport(x = 0, y = 0, width, height)
 
-    // language=GLSL
+    // Shaders
     val vertexShader = gl.compileShader(VertexShader)
     val splatShader = gl.compileShader(SplatterShader)
     val displayShader = gl.compileShader(DisplayShader)
     val advectionShader = gl.compileShader(AdvectionShader)
 
-    gl.viewport(0, 0, textureWidth, textureHeight)
-
+    // Programs
     val displayProgram = GLProgram(gl, vertexShader, displayShader)
     val splatProgram = GLProgram(gl, vertexShader, splatShader)
     val advectionProgram = GLProgram(gl, vertexShader, advectionShader)
 
+    // Framebuffers
     setUpBlittingFramebuffers(gl)
+    val densityFramebuffer = createDoubleFramebuffer(gl, textureId = 2, width, height)
+    val velocityFramebuffer = createDoubleFramebuffer(gl, textureId = 0, width, height)
 
-    val textureType = gl.getExtension("OES_texture_half_float").HALF_FLOAT_OES as Int
+    // State
+    val pointer = SelectionPointer()
+    val state = SimState(pointer, densityFramebuffer, velocityFramebuffer, width, height, displayProgram, splatProgram, advectionProgram)
 
-    val state = SimState(
-        pointer = Pointer(down = false, moved = false, x = 0f, y = 0f, dx = 0f, dy = 0f),
-        densityFramebuffer = createDoubleFramebuffer(
-            gl, 2, textureWidth, textureHeight, GL.RGBA, GL.RGBA,
-            textureType, GL.LINEAR
-        ),
-        velocityFramebuffer = createDoubleFramebuffer(
-            gl, 0, textureWidth, textureHeight, GL.RGBA, GL.RGBA,
-            textureType, GL.LINEAR
-        ),
-        width = textureWidth,
-        height = textureHeight,
-        displayProgram = displayProgram,
-        splatProgram = splatProgram,
-        advectionProgram = advectionProgram,
-    )
-
-    canvas.onmousemove = {
-        it.preventDefault()
-        state.pointer.dx = (it.offsetX - state.pointer.x).toFloat() * 100f
-        state.pointer.dy = (it.offsetY - state.pointer.y).toFloat() * 100f
-        state.pointer.x = it.offsetX.toFloat()
-        state.pointer.y = it.offsetY.toFloat()
-
-        null
-    }
-
-    canvas.onmousedown = {
-        state.pointer.down = true
-        state.pointer.color = arrayOf(
-            Random.nextFloat() * 10,
-            Random.nextFloat() * 10,
-            Random.nextFloat() * 10
+    // Selection pointer events.
+    canvas.addEventListener("mousemove", { event ->
+        event.preventDefault()
+        event as MouseEvent
+        state.pointer = state.pointer.copy(
+            x = event.offsetX.toFloat(), y = event.offsetY.toFloat(),
+            dx = (event.offsetX - state.pointer.x).toFloat() * 100,
+            dy = (event.offsetY - state.pointer.y).toFloat() * 100,
         )
-        null
-    }
+    })
+    canvas.addEventListener("mousedown", {
+        state.pointer = state.pointer.copy(down = true, color = randomColor())
+    })
+    canvas.addEventListener("mouseup", { state.pointer = state.pointer.copy(down = false) })
 
-    canvas.onmouseup = {
-        state.pointer.down = false
-        null
-    }
-
-    gl.viewport(0, 0, state.width, state.height)
-    (0..5).forEach { _ ->
-        splat(
-            splatProgram, gl, canvas,
-            x = Random.nextDouble().toFloat() * canvas.width.toFloat(),
-            y = Random.nextDouble().toFloat() * canvas.height.toFloat(),
-            dx = 1000 * (Random.nextDouble() - 0.5).toFloat(),
-            dy = 1000 * (Random.nextDouble() - 0.5).toFloat(),
-            state,
-            arrayOf(10f, 20f, 30f)
-        )
-    }
-    update(gl, canvas, state)
+    return state
 }
 
-fun update(gl: GL, canvas: HTMLCanvasElement, state: SimState) {
+fun run2dFluidSimulation(gl: GL, state: SimState) {
     val dt = 0.016f
 
-    gl.viewport(0, 0, state.width, state.height)
+    with(state) {
+        gl.viewport(x = 0, y = 0, width, height)
 
-    state.advectionProgram.bind()
-    gl.uniform2f(
-        state.advectionProgram.uniforms["texelSize"]!!,
-        1f / state.width,
-        1f / state.height
-    )
-    gl.uniform1i(
-        state.advectionProgram.uniforms["uVelocity"]!!,
-        state.velocityFramebuffer.read.textureId
-    )
-    gl.uniform1i(
-        state.advectionProgram.uniforms["uSource"]!!,
-        state.velocityFramebuffer.read.textureId
-    )
-    gl.uniform1f(state.advectionProgram.uniforms["dt"]!!, dt)
-    blit(gl, state.velocityFramebuffer.write.framebuffer)
-    state.velocityFramebuffer.swap()
+        advectionProgram.bind()
+        gl.uniform2f(advectionProgram["texelSize"], 1f / width, 1f / height)
+        gl.uniform1i(advectionProgram["uVelocity"], velocityFramebuffer.read.textureId)
+        gl.uniform1i(advectionProgram["uSource"], velocityFramebuffer.read.textureId)
+        gl.uniform1f(advectionProgram["dt"], dt)
+        blit(gl, velocityFramebuffer.write.framebuffer)
+        velocityFramebuffer.swap()
+        gl.uniform1i(advectionProgram["uVelocity"], velocityFramebuffer.read.textureId)
+        gl.uniform1i(advectionProgram["uSource"], densityFramebuffer.read.textureId)
+        blit(gl, densityFramebuffer.write.framebuffer)
+        densityFramebuffer.swap()
 
-    gl.uniform1i(
-        state.advectionProgram.uniforms["uVelocity"]!!,
-        state.velocityFramebuffer.read.textureId
-    )
-    gl.uniform1i(
-        state.advectionProgram.uniforms["uSource"]!!,
-        state.densityFramebuffer.read.textureId
-    )
-    blit(gl, state.densityFramebuffer.write.framebuffer)
-    state.densityFramebuffer.swap()
+        if (pointer.down) {
+            splat(gl, state, pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color)
+        }
 
-    if (state.pointer.down) {
-        println(state.pointer)
-        splat(
-            state.splatProgram,
-            gl,
-            canvas,
-            state.pointer.x,
-            state.pointer.y,
-            state.pointer.dx,
-            state.pointer.dy,
-            state,
-            state.pointer.color
-        )
+        gl.viewport(x = 0, y = 0, width, height)
+
+        displayProgram.bind()
+        gl.uniform1i(displayProgram["uTexture"], densityFramebuffer.read.textureId)
+        blit(gl, null)
     }
 
-    gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight)
-    state.displayProgram.bind()
-    gl.uniform1i(state.displayProgram.uniforms["uTexture"], state.densityFramebuffer.read.textureId)
-    blit(gl, null)
-
-    window.requestAnimationFrame { update(gl, canvas, state) }
+    window.requestAnimationFrame { run2dFluidSimulation(gl, state) }
 }
 
-fun splat(
-    splatProgram: GLProgram,
-    gl: GL,
-    canvas: HTMLCanvasElement,
-    x: Float,
-    y: Float,
-    dx: Float,
-    dy: Float,
-    state: SimState,
-    color: Array<Float>
-) {
+fun splat(gl: GL, state: SimState, x: Float, y: Float, dx: Float, dy: Float, color: Color) = with(state) {
     splatProgram.bind()
-    gl.uniform1i(splatProgram.uniforms["uTarget"]!!, state.velocityFramebuffer.read.textureId)
-    gl.uniform1f(splatProgram.uniforms["aspectRatio"]!!, canvas.width / canvas.height.toFloat())
-    gl.uniform2f(splatProgram.uniforms["point"]!!, x / canvas.width, 1f - y / canvas.height)
+    gl.uniform1i(splatProgram.uniforms["uTarget"]!!, velocityFramebuffer.read.textureId)
+    gl.uniform1f(splatProgram.uniforms["aspectRatio"]!!, width / height.toFloat())
+    gl.uniform2f(splatProgram.uniforms["point"]!!, x / width, 1f - y / height)
     gl.uniform3f(splatProgram.uniforms["color"]!!, dx, -dy, 1f)
     gl.uniform1f(splatProgram.uniforms["radius"]!!, 0.005f)
     blit(gl, state.velocityFramebuffer.write.framebuffer)
-    state.velocityFramebuffer.swap()
+    velocityFramebuffer.swap()
 
-    gl.uniform1i(splatProgram.uniforms["uTarget"]!!, state.densityFramebuffer.read.textureId)
-    gl.uniform3f(splatProgram.uniforms["color"]!!, color[0], color[1], color[2])
-    blit(gl, state.densityFramebuffer.write.framebuffer)
-    state.densityFramebuffer.swap()
+    gl.uniform1i(splatProgram.uniforms["uTarget"]!!, densityFramebuffer.read.textureId)
+    gl.uniform3f(splatProgram.uniforms["color"]!!, color.r, color.g, color.b)
+    blit(gl, densityFramebuffer.write.framebuffer)
+    densityFramebuffer.swap()
 }
+
 
 /**
  * Sets up "blitting" framebuffers used for final drawing.
@@ -214,7 +143,7 @@ fun blit(gl: GL, destination: WebGLFramebuffer?) {
 
 fun createFramebuffer(
     gl: GL, textureId: Int, w: Int, h: Int,
-    internalFormat: Int, format: Int, type: Int, filter: Int
+    internalFormat: Int = GL.RGBA, format: Int = GL.RGBA, textureType: Int = gl.textureType, filter: Int = GL.LINEAR,
 ): Framebuffer {
     gl.activeTexture(GL.TEXTURE0 + textureId)
     val texture = gl.createTexture()!!
@@ -223,12 +152,12 @@ fun createFramebuffer(
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, filter)
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE)
     gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE)
-    gl.texImage2D(GL.TEXTURE_2D, 0, internalFormat, w, h, 0, format, type, null)
+    gl.texImage2D(GL.TEXTURE_2D, level = 0, internalFormat, w, h, border = 0, format, textureType, pixels = null)
 
     val framebuffer = gl.createFramebuffer()!!
     gl.bindFramebuffer(GL.FRAMEBUFFER, framebuffer)
-    gl.framebufferTexture2D(GL.FRAMEBUFFER, GL.COLOR_ATTACHMENT0, GL.TEXTURE_2D, texture, 0)
-    gl.viewport(0, 0, w, h)
+    gl.framebufferTexture2D(GL.FRAMEBUFFER, GL.COLOR_ATTACHMENT0, GL.TEXTURE_2D, texture, level = 0)
+    gl.viewport(x = 0, y = 0, w, h)
     gl.clear(GL.COLOR_BUFFER_BIT)
 
     return Framebuffer(framebuffer, texture, textureId)
@@ -236,8 +165,8 @@ fun createFramebuffer(
 
 fun createDoubleFramebuffer(
     gl: GL, textureId: Int, w: Int, h: Int,
-    internalFormat: Int, format: Int, type: Int, filter: Int
+    internalFormat: Int = GL.RGBA, format: Int = GL.RGBA, textureType: Int = gl.textureType, filter: Int = GL.LINEAR,
 ) = DoubleFramebuffer(
-    write = createFramebuffer(gl, textureId, w, h, internalFormat, format, type, filter),
-    read = createFramebuffer(gl, textureId + 1, w, h, internalFormat, format, type, filter),
+    write = createFramebuffer(gl, textureId, w, h, internalFormat, format, textureType, filter),
+    read = createFramebuffer(gl, textureId + 1, w, h, internalFormat, format, textureType, filter),
 )
