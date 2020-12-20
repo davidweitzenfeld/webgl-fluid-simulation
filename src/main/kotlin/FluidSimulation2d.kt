@@ -1,4 +1,6 @@
 import ext.compileShader
+import ext.float32ArrayOf
+import ext.uint16ArrayOf
 import glsl.AdvectionShader
 import glsl.DisplayShader
 import glsl.SplatterShader
@@ -18,15 +20,12 @@ data class SimState(
     var pointer: Pointer,
     var densityFramebuffer: DoubleFramebuffer,
     var velocityFramebuffer: DoubleFramebuffer,
-    var blit: (WebGLFramebuffer?) -> Unit,
     var width: Int,
     var height: Int,
     val displayProgram: GLProgram,
     val splatProgram: GLProgram,
     val advectionProgram: GLProgram,
 )
-
-var blitFn: (WebGLFramebuffer?) -> Unit = {}
 
 fun shader(gl: GL, canvas: HTMLCanvasElement) {
     val textureWidth = gl.drawingBufferWidth shr 0
@@ -47,7 +46,7 @@ fun shader(gl: GL, canvas: HTMLCanvasElement) {
     val splatProgram = GLProgram(gl, vertexShader, splatShader)
     val advectionProgram = GLProgram(gl, vertexShader, advectionShader)
 
-    blitFn = blit(gl)
+    setUpBlittingFramebuffers(gl)
 
     val textureType = gl.getExtension("OES_texture_half_float").HALF_FLOAT_OES as Int
 
@@ -61,7 +60,6 @@ fun shader(gl: GL, canvas: HTMLCanvasElement) {
             gl, 0, textureWidth, textureHeight, GL.RGBA, GL.RGBA,
             textureType, GL.LINEAR
         ),
-        blit = blitFn,
         width = textureWidth,
         height = textureHeight,
         displayProgram = displayProgram,
@@ -129,7 +127,7 @@ fun update(gl: GL, canvas: HTMLCanvasElement, state: SimState) {
         state.velocityFramebuffer.read.textureId
     )
     gl.uniform1f(state.advectionProgram.uniforms["dt"]!!, dt)
-    state.blit(state.velocityFramebuffer.write.framebuffer)
+    blit(gl, state.velocityFramebuffer.write.framebuffer)
     state.velocityFramebuffer.swap()
 
     gl.uniform1i(
@@ -140,7 +138,7 @@ fun update(gl: GL, canvas: HTMLCanvasElement, state: SimState) {
         state.advectionProgram.uniforms["uSource"]!!,
         state.densityFramebuffer.read.textureId
     )
-    state.blit(state.densityFramebuffer.write.framebuffer)
+    blit(gl, state.densityFramebuffer.write.framebuffer)
     state.densityFramebuffer.swap()
 
     if (state.pointer.down) {
@@ -161,7 +159,7 @@ fun update(gl: GL, canvas: HTMLCanvasElement, state: SimState) {
     gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight)
     state.displayProgram.bind()
     gl.uniform1i(state.displayProgram.uniforms["uTexture"], state.densityFramebuffer.read.textureId)
-    blitFn(null)
+    blit(gl, null)
 
     window.requestAnimationFrame { update(gl, canvas, state) }
 }
@@ -183,34 +181,36 @@ fun splat(
     gl.uniform2f(splatProgram.uniforms["point"]!!, x / canvas.width, 1f - y / canvas.height)
     gl.uniform3f(splatProgram.uniforms["color"]!!, dx, -dy, 1f)
     gl.uniform1f(splatProgram.uniforms["radius"]!!, 0.005f)
-    blitFn(state.velocityFramebuffer.write.framebuffer)
+    blit(gl, state.velocityFramebuffer.write.framebuffer)
     state.velocityFramebuffer.swap()
 
     gl.uniform1i(splatProgram.uniforms["uTarget"]!!, state.densityFramebuffer.read.textureId)
     gl.uniform3f(splatProgram.uniforms["color"]!!, color[0], color[1], color[2])
-    blitFn(state.densityFramebuffer.write.framebuffer)
+    blit(gl, state.densityFramebuffer.write.framebuffer)
     state.densityFramebuffer.swap()
 }
 
-fun blit(gl: GL): (WebGLFramebuffer?) -> Unit {
+/**
+ * Sets up "blitting" framebuffers used for final drawing.
+ */
+fun setUpBlittingFramebuffers(gl: GL) {
+    // Rectangle of size 2 by 2 centered at (0, 0)
+    val rectangle = float32ArrayOf((-1f to -1f), (-1f to 1f), (1f to 1f), (1f to -1f))
     gl.bindBuffer(GL.ARRAY_BUFFER, gl.createBuffer())
-    gl.bufferData(
-        GL.ARRAY_BUFFER,
-        Float32Array(arrayOf(-1f, -1f, -1f, 1f, 1f, 1f, 1f, -1f)),
-        GL.STATIC_DRAW
-    )
+    gl.bufferData(GL.ARRAY_BUFFER, data = rectangle, GL.STATIC_DRAW)
 
+    // Two triangles making up the rectangle above.
+    val triangleIndices = uint16ArrayOf(0, 1, 2, 0, 2, 3)
     gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, gl.createBuffer())
-    gl.bufferData(GL.ELEMENT_ARRAY_BUFFER, Uint16Array(arrayOf(0, 1, 2, 0, 2, 3)), GL.STATIC_DRAW)
-    gl.vertexAttribPointer(/* aPosition */  0, 2, GL.FLOAT, false, 0, 0)
-    gl.enableVertexAttribArray(0)
-
-    return { destination: WebGLFramebuffer? ->
-        gl.bindFramebuffer(GL.FRAMEBUFFER, destination)
-        gl.drawElements(GL.TRIANGLES, 6, GL.UNSIGNED_SHORT, 0)
-    }
+    gl.bufferData(GL.ELEMENT_ARRAY_BUFFER, data = triangleIndices, GL.STATIC_DRAW)
+    gl.vertexAttribPointer(/* aPosition */ index = 0, size = 2, type = GL.FLOAT, normalized = false, stride = 0, offset = 0)
+    gl.enableVertexAttribArray(index = 0)
 }
 
+fun blit(gl: GL, destination: WebGLFramebuffer?) {
+    gl.bindFramebuffer(GL.FRAMEBUFFER, destination)
+    gl.drawElements(GL.TRIANGLES, 6, GL.UNSIGNED_SHORT, 0)
+}
 
 fun createFramebuffer(
     gl: GL, textureId: Int, w: Int, h: Int,

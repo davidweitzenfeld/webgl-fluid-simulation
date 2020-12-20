@@ -1,6 +1,8 @@
 package ext
 
 import glsl.Shader
+import org.khronos.webgl.Float32Array
+import org.khronos.webgl.Uint16Array
 import org.khronos.webgl.WebGLProgram
 import org.khronos.webgl.WebGLShader
 import org.khronos.webgl.WebGLRenderingContext as GL
@@ -26,3 +28,9 @@ inline fun <reified T> GL.getParameter(program: WebGLProgram, param: Int): T {
 inline fun <reified T> GL.getParameter(shader: WebGLShader, param: Int): T {
     return getShaderParameter(shader, param) as T
 }
+
+fun float32ArrayOf(vararg elements: Float) = Float32Array(elements.toTypedArray())
+
+fun float32ArrayOf(vararg elements: Pair<Float, Float>) = Float32Array(elements.flatMap { it.toList() }.toTypedArray())
+
+fun uint16ArrayOf(vararg elements: Short) = Uint16Array(elements.toTypedArray())
