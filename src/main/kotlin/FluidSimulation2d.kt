@@ -115,26 +115,3 @@ fun splat(gl: GL, state: SimState, x: Float, y: Float, dx: Float, dy: Float, col
     blit(gl, densityFramebuffer.write.framebuffer)
     densityFramebuffer.swap()
 }
-
-
-/**
- * Sets up "blitting" framebuffers used for final drawing.
- */
-fun setUpBlittingFramebuffers(gl: GL) {
-    // Rectangle of size 2 by 2 centered at (0, 0)
-    val rectangle = float32ArrayOf((-1f to -1f), (-1f to 1f), (1f to 1f), (1f to -1f))
-    gl.bindBuffer(GL.ARRAY_BUFFER, gl.createBuffer())
-    gl.bufferData(GL.ARRAY_BUFFER, data = rectangle, GL.STATIC_DRAW)
-
-    // Two triangles making up the rectangle above.
-    val triangleIndices = uint16ArrayOf(0, 1, 2, 0, 2, 3)
-    gl.bindBuffer(GL.ELEMENT_ARRAY_BUFFER, gl.createBuffer())
-    gl.bufferData(GL.ELEMENT_ARRAY_BUFFER, data = triangleIndices, GL.STATIC_DRAW)
-    gl.vertexAttribPointer(/* aPosition */ index = 0, size = 2, type = GL.FLOAT, normalized = false, stride = 0, offset = 0)
-    gl.enableVertexAttribArray(index = 0)
-}
-
-fun blit(gl: GL, destination: WebGLFramebuffer?) {
-    gl.bindFramebuffer(GL.FRAMEBUFFER, destination)
-    gl.drawElements(GL.TRIANGLES, 6, GL.UNSIGNED_SHORT, 0)
-}
