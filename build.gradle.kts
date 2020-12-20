@@ -14,10 +14,6 @@ dependencies {
     implementation(kotlin("stdlib-js"))
     implementation("org.jetbrains.kotlinx:kotlinx-html-js:0.7.1")
     implementation(npm("gl-matrix", "3.3.0"))
-
-    // Sourced from https://github.com/liorgonnen/kotlin-three-js-starter.
-    implementation(project(":kt-decs:threejs_kt"))
-    implementation(project(":kt-decs:statsjs_kt"))
 }
 
 kotlin {
