@@ -1,6 +1,5 @@
 import ext.compileShader
 import ext.float32ArrayOf
-import ext.textureType
 import ext.uint16ArrayOf
 import glsl.AdvectionShader
 import glsl.DisplayShader
@@ -8,7 +7,6 @@ import glsl.SplatterShader
 import glsl.VertexShader
 import kotlinx.browser.window
 import model.DoubleFramebuffer
-import model.Framebuffer
 import model.SelectionPointer
 import org.khronos.webgl.WebGLFramebuffer
 import org.w3c.dom.HTMLCanvasElement
@@ -140,33 +138,3 @@ fun blit(gl: GL, destination: WebGLFramebuffer?) {
     gl.bindFramebuffer(GL.FRAMEBUFFER, destination)
     gl.drawElements(GL.TRIANGLES, 6, GL.UNSIGNED_SHORT, 0)
 }
-
-fun createFramebuffer(
-    gl: GL, textureId: Int, w: Int, h: Int,
-    internalFormat: Int = GL.RGBA, format: Int = GL.RGBA, textureType: Int = gl.textureType, filter: Int = GL.LINEAR,
-): Framebuffer {
-    gl.activeTexture(GL.TEXTURE0 + textureId)
-    val texture = gl.createTexture()!!
-    gl.bindTexture(GL.TEXTURE_2D, texture)
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MIN_FILTER, filter)
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_MAG_FILTER, filter)
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_S, GL.CLAMP_TO_EDGE)
-    gl.texParameteri(GL.TEXTURE_2D, GL.TEXTURE_WRAP_T, GL.CLAMP_TO_EDGE)
-    gl.texImage2D(GL.TEXTURE_2D, level = 0, internalFormat, w, h, border = 0, format, textureType, pixels = null)
-
-    val framebuffer = gl.createFramebuffer()!!
-    gl.bindFramebuffer(GL.FRAMEBUFFER, framebuffer)
-    gl.framebufferTexture2D(GL.FRAMEBUFFER, GL.COLOR_ATTACHMENT0, GL.TEXTURE_2D, texture, level = 0)
-    gl.viewport(x = 0, y = 0, w, h)
-    gl.clear(GL.COLOR_BUFFER_BIT)
-
-    return Framebuffer(framebuffer, texture, textureId)
-}
-
-fun createDoubleFramebuffer(
-    gl: GL, textureId: Int, w: Int, h: Int,
-    internalFormat: Int = GL.RGBA, format: Int = GL.RGBA, textureType: Int = gl.textureType, filter: Int = GL.LINEAR,
-) = DoubleFramebuffer(
-    write = createFramebuffer(gl, textureId, w, h, internalFormat, format, textureType, filter),
-    read = createFramebuffer(gl, textureId + 1, w, h, internalFormat, format, textureType, filter),
-)
