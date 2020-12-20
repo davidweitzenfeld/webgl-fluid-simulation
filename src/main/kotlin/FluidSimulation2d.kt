@@ -23,6 +23,7 @@ data class SimState(
     val divergenceProgram: GLProgram,
     val pressureSolverProgram: GLProgram,
     val gradientSubtractProgram: GLProgram,
+    val boundaryConditionProgram: GLProgram,
 )
 
 fun init2dFluidSimulation(canvas: HTMLCanvasElement, gl: GL): SimState {
@@ -40,6 +41,7 @@ fun init2dFluidSimulation(canvas: HTMLCanvasElement, gl: GL): SimState {
     val divergenceShader = gl.compileShader(DivergenceShader)
     val jacobiSolverShader = gl.compileShader(JacobiSolverShader)
     val gradientSubtractShader = gl.compileShader(GradientSubtractShader)
+    val boundaryConditionShader = gl.compileShader(BoundaryConditionShader)
 
     // Programs
     val displayProgram = GLProgram(gl, vertexShader, displayShader)
@@ -49,6 +51,7 @@ fun init2dFluidSimulation(canvas: HTMLCanvasElement, gl: GL): SimState {
     val externalForcesProgram = GLProgram(gl, vertexShader, externalForcesShader)
     val jacobiSolverProgram = GLProgram(gl, vertexShader, jacobiSolverShader)
     val gradientSubtractProgram = GLProgram(gl, vertexShader, gradientSubtractShader)
+    val boundaryConditionProgram = GLProgram(gl, vertexShader, boundaryConditionShader)
 
     // Framebuffers
     setUpBlittingFramebuffers(gl)
@@ -60,7 +63,7 @@ fun init2dFluidSimulation(canvas: HTMLCanvasElement, gl: GL): SimState {
     // State
     val pointer = SelectionPointer()
     val state = SimState(pointer, densityFramebuffer, velocityFramebuffer, divergenceFramebuffer, pressureFramebuffer, width, height,
-        displayProgram, splatProgram, advectionProgram, externalForcesProgram, divergenceProgram, jacobiSolverProgram, gradientSubtractProgram)
+        displayProgram, splatProgram, advectionProgram, externalForcesProgram, divergenceProgram, jacobiSolverProgram, gradientSubtractProgram, boundaryConditionProgram)
 
     // Selection pointer events.
     canvas.addEventListener("mousemove", { event ->
@@ -134,6 +137,18 @@ fun run2dFluidSimulation(gl: GL, state: SimState) {
         gl.uniform1i(gradientSubtractProgram["velocityTexture"], velocityFramebuffer.read.textureId)
         blit(gl, velocityFramebuffer.write.framebuffer)
         velocityFramebuffer.swap()
+
+        boundaryConditionProgram.bind()
+        gl.uniform2f(boundaryConditionProgram["texelSize"], 1f / width, 1f / height)
+        gl.uniform1f(boundaryConditionProgram["scale"], -1f)
+        gl.uniform1i(boundaryConditionProgram["texture"], velocityFramebuffer.read.textureId)
+        blit(gl, velocityFramebuffer.write.framebuffer)
+        velocityFramebuffer.swap()
+        gl.bindTexture(GL.TEXTURE_2D, pressureFramebuffer.read.texture)
+        gl.uniform1f(boundaryConditionProgram["scale"], 1f)
+        gl.uniform1i(boundaryConditionProgram["texture"], pressureFramebuffer.read.textureId)
+        blit(gl, pressureFramebuffer.write.framebuffer)
+        pressureFramebuffer.swap()
 
         gl.viewport(x = 0, y = 0, width, height)
 
