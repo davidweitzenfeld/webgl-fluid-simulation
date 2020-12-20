@@ -1,14 +1,8 @@
 import ext.compileShader
-import ext.float32ArrayOf
-import ext.uint16ArrayOf
-import glsl.AdvectionShader
-import glsl.DisplayShader
-import glsl.SplatterShader
-import glsl.VertexShader
+import glsl.*
 import kotlinx.browser.window
 import model.DoubleFramebuffer
 import model.SelectionPointer
-import org.khronos.webgl.WebGLFramebuffer
 import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.events.MouseEvent
 import org.khronos.webgl.WebGLRenderingContext as GL
@@ -22,6 +16,7 @@ data class SimState(
     val displayProgram: GLProgram,
     val splatProgram: GLProgram,
     val advectionProgram: GLProgram,
+    val externalForcesProgram: GLProgram,
 )
 
 fun init2dFluidSimulation(canvas: HTMLCanvasElement, gl: GL): SimState {
@@ -35,11 +30,13 @@ fun init2dFluidSimulation(canvas: HTMLCanvasElement, gl: GL): SimState {
     val splatShader = gl.compileShader(SplatterShader)
     val displayShader = gl.compileShader(DisplayShader)
     val advectionShader = gl.compileShader(AdvectionShader)
+    val externalForcesShader = gl.compileShader(ExternalForcesShader)
 
     // Programs
     val displayProgram = GLProgram(gl, vertexShader, displayShader)
     val splatProgram = GLProgram(gl, vertexShader, splatShader)
     val advectionProgram = GLProgram(gl, vertexShader, advectionShader)
+    val externalForcesProgram = GLProgram(gl, vertexShader, externalForcesShader)
 
     // Framebuffers
     setUpBlittingFramebuffers(gl)
@@ -48,7 +45,7 @@ fun init2dFluidSimulation(canvas: HTMLCanvasElement, gl: GL): SimState {
 
     // State
     val pointer = SelectionPointer()
-    val state = SimState(pointer, densityFramebuffer, velocityFramebuffer, width, height, displayProgram, splatProgram, advectionProgram)
+    val state = SimState(pointer, densityFramebuffer, velocityFramebuffer, width, height, displayProgram, splatProgram, advectionProgram, externalForcesProgram)
 
     // Selection pointer events.
     canvas.addEventListener("mousemove", { event ->
@@ -73,6 +70,13 @@ fun run2dFluidSimulation(gl: GL, state: SimState) {
 
     with(state) {
         gl.viewport(x = 0, y = 0, width, height)
+
+        externalForcesProgram.bind()
+        gl.uniform1i(externalForcesProgram["uVelocity"], velocityFramebuffer.read.textureId)
+        gl.uniform2f(externalForcesProgram["f"], 0f, -9.81f)
+        gl.uniform1f(externalForcesProgram["dt"], dt)
+        blit(gl, velocityFramebuffer.write.framebuffer)
+        velocityFramebuffer.swap()
 
         advectionProgram.bind()
         gl.uniform2f(advectionProgram["texelSize"], 1f / width, 1f / height)
