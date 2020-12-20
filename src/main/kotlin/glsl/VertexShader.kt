@@ -17,23 +17,29 @@ object VertexShader : Shader {
         attribute vec2 aPosition;
         
         // Texel position for use in fragment shader.
-        varying vec2 vUv;
+        varying vec2 texel;
         
         // Edges of texture for use in fragment shader.
-        varying vec2 vL;
-        varying vec2 vR;
-        varying vec2 vT;
-        varying vec2 vB;
+        varying vec2 leftTexel;
+        varying vec2 rightTexel;
+        varying vec2 upTexel;
+        varying vec2 downTexel;
         
         // Texture size.
         uniform vec2 texelSize;
+        
+        vec2 texelAtOffset(in vec2 v, in vec2 offset) {
+            return v + offset * texelSize;
+        }
 
         void main () {
-            vUv = aPosition * 0.5 + 0.5;
-            vL = vUv - vec2(texelSize.x, 0.0);
-            vR = vUv + vec2(texelSize.x, 0.0);
-            vT = vUv + vec2(0.0, texelSize.y);
-            vB = vUv - vec2(0.0, texelSize.y);
+            texel = aPosition * 0.5 + 0.5;
+            
+            leftTexel = texelAtOffset(texel, vec2(-1.0, 0.0));
+            rightTexel = texelAtOffset(texel, vec2(1.0, 0.0));
+            upTexel = texelAtOffset(texel, vec2(0.0, 1.0));
+            downTexel = texelAtOffset(texel, vec2(0.0, -1.0));
+            
             gl_Position = vec4(aPosition, 0.0, 1.0);
         }
     """.trimIndent()

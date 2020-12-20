@@ -10,11 +10,11 @@ object DisplayShader : Shader {
         precision highp float;
         precision mediump sampler2D;
 
-        varying vec2 vUv;
-        uniform sampler2D uTexture;
+        varying vec2 texel;
+        uniform sampler2D texture;
 
         void main () {
-            gl_FragColor = texture2D(uTexture, vUv);
+            gl_FragColor = texture2D(texture, texel);
         }
     """.trimIndent()
 }

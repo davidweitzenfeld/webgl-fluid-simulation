@@ -13,9 +13,9 @@ object SplatterShader : Shader {
         precision highp float;
         precision mediump sampler2D;
 
-        varying vec2 vUv; // Texel position.
+        varying vec2 texel; // Texel position.
         
-        uniform sampler2D uTarget; // Target texture.
+        uniform sampler2D texture; // Target texture.
         uniform float aspectRatio; // Texture aspect ratio.
         uniform vec3 color;
         uniform vec2 point; // Point to splatter around.
@@ -24,12 +24,12 @@ object SplatterShader : Shader {
         void main () {
         
             // Distance between this texel and the splatter point.
-            vec2 diffVec = vUv - point.xy;
+            vec2 diffVec = texel - point.xy;
             diffVec.x *= aspectRatio;
             float dist = dot(diffVec, diffVec);
 
             // Brighter color closer to point.
-            vec3 base = texture2D(uTarget, vUv).xyz;
+            vec3 base = texture2D(texture, texel).xyz;
             vec3 splatter = exp(-dist / radius) * color;
             gl_FragColor = vec4(base + splatter, 1.0);
         }

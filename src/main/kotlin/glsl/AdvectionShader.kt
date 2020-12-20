@@ -10,19 +10,19 @@ object AdvectionShader : Shader {
         precision highp float;
         precision mediump sampler2D;
 
-        varying vec2 vUv;
-        uniform sampler2D uVelocity;
-        uniform sampler2D uSource;
+        varying vec2 texel;
+        uniform sampler2D velocityTexture;
+        uniform sampler2D sourceTexture;
         uniform vec2 texelSize;
         uniform float dt;
         uniform float dissipation;
 
         void main () {
             // Position update.
-            vec2 v = texture2D(uVelocity, vUv).xy * texelSize; // Velocity.
-            vec2 vUvNext = vUv - dt * v;
+            vec2 v = texture2D(velocityTexture, texel).xy * texelSize; // Velocity.
+            vec2 texelNext = texel - dt * v;
             
-            gl_FragColor = texture2D(uSource, vUvNext);
+            gl_FragColor = texture2D(sourceTexture, texelNext);
         }
     """.trimIndent()
 }
