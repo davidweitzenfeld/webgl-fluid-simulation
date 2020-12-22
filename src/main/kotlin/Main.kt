@@ -16,6 +16,7 @@ fun main() {
         document.body!!.append(canvas)
 
         val gl = canvas.getContext("webgl") as GL
+        gl.getExtension("OES_texture_half_float_linear")
         val state = init2dFluidSimulation(canvas, gl)
         run2dFluidSimulation(gl, state)
     })
