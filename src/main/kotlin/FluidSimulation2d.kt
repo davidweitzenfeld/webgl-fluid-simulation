@@ -29,7 +29,7 @@ data class SimState(
 fun init2dFluidSimulation(canvas: HTMLCanvasElement, gl: GL): SimState {
     val (width, height) = gl.drawingBufferWidth to gl.drawingBufferHeight
 
-    gl.clearColor(red = 0f, green = 0f, blue = 0f, alpha = 1f)
+    gl.clearColor(red = 0.102f, green = 0.102f, blue = 0.102f, alpha = 1f)
     gl.viewport(x = 0, y = 0, width, height)
 
     // Shaders
