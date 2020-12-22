@@ -75,8 +75,9 @@ fun init2dFluidSimulation(canvas: HTMLCanvasElement, gl: GL): SimState {
             dy = (event.offsetY - state.pointer.y).toFloat() * 100,
         )
     })
-    canvas.addEventListener("mousedown", {
-        state.pointer = state.pointer.copy(down = true, color = randomColor())
+    canvas.addEventListener("mousedown", { event ->
+        event as MouseEvent
+        state.pointer = state.pointer.copy(down = true, color = randomColor(), button = event.button.toInt())
     })
     canvas.addEventListener("mouseup", { state.pointer = state.pointer.copy(down = false) })
 
@@ -101,8 +102,10 @@ fun run2dFluidSimulation(gl: GL, state: SimState) {
         blit(gl, densityFramebuffer.write.framebuffer)
         densityFramebuffer.swap()
 
-        if (pointer.down) {
+        if (pointer.down && pointer.button == 0) {
             splat(gl, state, pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color)
+        } else if(pointer.down && pointer.button != 0) {
+            velocitySplat(gl, state, pointer.x, pointer.y, pointer.dx, pointer.dy)
         }
 
         externalForcesProgram.bind()
@@ -174,4 +177,15 @@ fun splat(gl: GL, state: SimState, x: Float, y: Float, dx: Float, dy: Float, col
     gl.uniform3f(splatProgram.uniforms["color"]!!, color.r, color.g, color.b)
     blit(gl, densityFramebuffer.write.framebuffer)
     densityFramebuffer.swap()
+}
+
+fun velocitySplat(gl: GL, state: SimState, x: Float, y: Float, dx: Float, dy: Float) = with(state) {
+    splatProgram.bind()
+    gl.uniform1i(splatProgram.uniforms["texture"]!!, velocityFramebuffer.read.textureId)
+    gl.uniform1f(splatProgram.uniforms["aspectRatio"]!!, width / height.toFloat())
+    gl.uniform2f(splatProgram.uniforms["point"]!!, x / width, 1f - y / height)
+    gl.uniform3f(splatProgram.uniforms["color"]!!, dx, -dy, 1f)
+    gl.uniform1f(splatProgram.uniforms["radius"]!!, 0.005f)
+    blit(gl, state.velocityFramebuffer.write.framebuffer)
+    velocityFramebuffer.swap()
 }

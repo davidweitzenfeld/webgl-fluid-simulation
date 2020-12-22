@@ -4,6 +4,7 @@ import Color
 
 data class SelectionPointer(
     val down: Boolean = false,
+    val button: Int = 0,
     val moved: Boolean = false,
     val x: Float = 0f,
     val y: Float = 0f,
