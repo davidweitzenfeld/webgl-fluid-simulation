@@ -24,10 +24,16 @@ object BoundaryConditionShader : Shader {
         uniform vec2 texelSize; 
         
         void main () {
-            if (leftTexel.x < texelSize.x || rightTexel.x > 1.0 - texelSize.x || upTexel.y > 1.0 - texelSize.y || downTexel.y < texelSize.y) {
-                gl_FragColor = scale * texture2D(texture, texel);
-            } else {
-                gl_FragColor = texture2D(texture, texel);
+            if (leftTexel.x < texelSize.x) {
+                gl_FragColor = scale * texture2D(texture, rightTexel);
+            } else if (rightTexel.x > 1.0 - texelSize.x) {
+                gl_FragColor = scale * texture2D(texture, leftTexel);
+            } else if (upTexel.y > 1.0 - texelSize.y) {
+                gl_FragColor = scale * texture2D(texture, downTexel);
+           } else if (downTexel.y < texelSize.y) {
+                gl_FragColor = scale * texture2D(texture, upTexel);
+           } else {
+                gl_FragColor = texture2D(texture, texel); 
             }
         }
     """.trimIndent()
