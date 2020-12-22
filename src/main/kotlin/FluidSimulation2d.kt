@@ -89,13 +89,6 @@ fun run2dFluidSimulation(gl: GL, state: SimState) {
     with(state) {
         gl.viewport(x = 0, y = 0, width, height)
 
-        externalForcesProgram.bind()
-        gl.uniform1i(externalForcesProgram["velocityTexture"], velocityFramebuffer.read.textureId)
-        gl.uniform2f(externalForcesProgram["f"], 0f, 0f)
-        gl.uniform1f(externalForcesProgram["dt"], dt)
-        blit(gl, velocityFramebuffer.write.framebuffer)
-        velocityFramebuffer.swap()
-
         advectionProgram.bind()
         gl.uniform2f(advectionProgram["texelSize"], 1f / width, 1f / height)
         gl.uniform1i(advectionProgram["velocityTexture"], velocityFramebuffer.read.textureId)
@@ -111,6 +104,13 @@ fun run2dFluidSimulation(gl: GL, state: SimState) {
         if (pointer.down) {
             splat(gl, state, pointer.x, pointer.y, pointer.dx, pointer.dy, pointer.color)
         }
+
+        externalForcesProgram.bind()
+        gl.uniform1i(externalForcesProgram["velocityTexture"], velocityFramebuffer.read.textureId)
+        gl.uniform2f(externalForcesProgram["f"], 0f, 0f)
+        gl.uniform1f(externalForcesProgram["dt"], dt)
+        blit(gl, velocityFramebuffer.write.framebuffer)
+        velocityFramebuffer.swap()
 
         divergenceProgram.bind()
         gl.uniform2f(divergenceProgram["texelSize"], 1f / width, 1f / height)
