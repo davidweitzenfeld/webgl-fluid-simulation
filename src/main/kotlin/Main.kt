@@ -10,8 +10,8 @@ fun main() {
     window.addEventListener("load", {
         val canvas = document.create.canvas {
             id = "canvas"
-            width = "600"
-            height = "400"
+            width = "800"
+            height = "600"
         }
         document.body!!.append(canvas)
 
