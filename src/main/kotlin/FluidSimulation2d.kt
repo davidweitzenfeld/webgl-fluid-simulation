@@ -21,7 +21,7 @@ data class SimState(
     val advectionProgram: GLProgram,
     val externalForcesProgram: GLProgram,
     val divergenceProgram: GLProgram,
-    val pressureSolverProgram: GLProgram,
+    val jacobiSolverProgram: GLProgram,
     val gradientSubtractProgram: GLProgram,
     val boundaryConditionProgram: GLProgram,
 )
@@ -118,12 +118,12 @@ fun run2dFluidSimulation(gl: GL, state: SimState) {
         gl.uniform1f(divergenceProgram["gridScale"], 1f)
         blit(gl, divergenceFramebuffer.framebuffer)
 
-        pressureSolverProgram.bind()
-        gl.uniform2f(pressureSolverProgram["texelSize"], 1f / width, 1f / height)
-        gl.uniform1f(pressureSolverProgram["alpha"], -1f)
-        gl.uniform1f(pressureSolverProgram["beta"], 4f)
-        gl.uniform1i(pressureSolverProgram["xTexture"], pressureFramebuffer.read.textureId)
-        gl.uniform1i(pressureSolverProgram["bTexture"], divergenceFramebuffer.textureId)
+        jacobiSolverProgram.bind()
+        gl.uniform2f(jacobiSolverProgram["texelSize"], 1f / width, 1f / height)
+        gl.uniform1f(jacobiSolverProgram["alpha"], -1f)
+        gl.uniform1f(jacobiSolverProgram["beta"], 4f)
+        gl.uniform1i(jacobiSolverProgram["xTexture"], pressureFramebuffer.read.textureId)
+        gl.uniform1i(jacobiSolverProgram["bTexture"], divergenceFramebuffer.textureId)
         gl.activeTexture(GL.TEXTURE0 + pressureFramebuffer.read.textureId)
         repeat(40) {
             gl.bindTexture(GL.TEXTURE_2D, pressureFramebuffer.read.texture)
